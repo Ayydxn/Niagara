@@ -1,1 +1,3 @@
-// niagara-api
+dependencies {
+    api(projects.niagaraCore)
+}

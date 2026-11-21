@@ -10,8 +10,6 @@ Unlike most native library Java bindings projects, Niagara supports both JNI and
 
 **Coming Soon!**
 
----
-
 ## 🏗️ Project Structure
 
 Niagara uses a modular approach that keeps everything cleanly separated and organized. These modules are as listed:
@@ -22,13 +20,9 @@ Niagara uses a modular approach that keeps everything cleanly separated and orga
 4. `niagara-ffm` - The FFM native backend implementation.
 5. `niagara-jni` - The JNI native backend implementation.
 
----
-
 ## 🛠️ Building From Sources
 
 **Coming Soon!**
-
----
 
 ## ❤️ Supporting Me
 

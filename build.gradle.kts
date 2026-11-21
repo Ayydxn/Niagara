@@ -17,6 +17,8 @@ subprojects {
     pluginManager.apply("java-library")
 
     dependencies {
+        compileOnly("org.jetbrains:annotations:${rootProject.property("jetbrains_annotations_version")}")
+
         testImplementation(platform("org.junit:junit-bom:${rootProject.property("junit_version")}"))
         testImplementation("org.junit.jupiter:junit-jupiter")
         testRuntimeOnly("org.junit.platform:junit-platform-launcher")
@@ -26,6 +28,9 @@ subprojects {
         toolchain {
             languageVersion.set(JavaLanguageVersion.of(17))
         }
+
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
 
         withJavadocJar()
         withSourcesJar()
@@ -42,6 +47,11 @@ subprojects {
 
     tasks.withType<Test>().configureEach {
         useJUnitPlatform()
+
+        testLogging {
+            events("passed", "skipped", "failed")
+        }
+
         failOnNoDiscoveredTests = false
     }
 }

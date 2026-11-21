@@ -1,1 +1,4 @@
-// niagara-core
+dependencies
+{
+
+}

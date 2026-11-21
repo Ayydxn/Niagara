@@ -1,1 +1,3 @@
-// niagara-jni
+dependencies {
+    implementation(projects.niagaraCore)
+}
