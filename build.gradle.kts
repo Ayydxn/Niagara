@@ -4,6 +4,15 @@ plugins {
 
 base.archivesName.set(rootProject.extra["archives_base_name"].toString())
 
+val nativeContractPackage = "me.ayydxn.niagara.core.natives"
+val nativeContractDirectory = file("niagara-core/src/main/java/${nativeContractPackage.replace('.', '/')}")
+
+extra["nativeContractClassNames"] = nativeContractDirectory.listFiles { file -> file.extension == "java" }
+    .orEmpty()
+    .filter { it.readText().contains(Regex("(?m)^@NativeInterface\\b")) }
+    .map { "$nativeContractPackage.${it.nameWithoutExtension}" }
+    .sorted()
+
 allprojects {
     group = rootProject.property("maven_group").toString()
     version = rootProject.property("version").toString()

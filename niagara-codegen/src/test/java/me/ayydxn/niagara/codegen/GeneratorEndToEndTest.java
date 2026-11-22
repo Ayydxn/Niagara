@@ -1,18 +1,13 @@
 package me.ayydxn.niagara.codegen;
 
 import me.ayydxn.niagara.codegen.fixtures.NotANativeInterface;
+import me.ayydxn.niagara.codegen.fixtures.PlainNatives;
 import me.ayydxn.niagara.codegen.fixtures.SampleNatives;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.jar.JarEntry;
-import java.util.jar.JarOutputStream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -22,20 +17,10 @@ class GeneratorEndToEndTest
     Path temp;
 
     @Test
-    void discoversOnlyContractsInTheJar() throws IOException
+    void generatesTheJniBindings() throws Exception
     {
-        Path jar = createJar(SampleNatives.class, NotANativeInterface.class);
-
-        assertEquals(List.of(SampleNatives.class), NativeInterfaceDiscovery.discover(jar, SampleNatives.class.getClassLoader()));
-    }
-
-    @Test
-    void generatesTheJniBindingsFromAJar() throws Exception
-    {
-        Path jar = createJar(SampleNatives.class, NotANativeInterface.class);
-
-        NiagaraNativeBindingsGenerator.main(new String[] {"--backend=jni", "--contracts=" + jar, "--java-out=" + temp.resolve("java"),
-                "--cpp-out=" + temp.resolve("cpp"), "--jni-package=me.ayydxn.niagara.jni.generated"});
+        NiagaraNativeBindingsGenerator.main(new String[] {"--backend=jni", "--java-out=" + temp.resolve("java"), "--cpp-out=" + temp.resolve("cpp"),
+                "--jni-package=me.ayydxn.niagara.jni.generated", SampleNatives.class.getName()});
 
         assertTrue(Files.exists(temp.resolve("java/me/ayydxn/niagara/jni/generated/JNISampleNatives.java")));
         assertTrue(Files.exists(temp.resolve("cpp/ultralight/Sample.h")));
@@ -44,54 +29,52 @@ class GeneratorEndToEndTest
     }
 
     @Test
-    void failsWhenTheJarHasNoContracts() throws IOException
+    void generatesTheFfmBindings() throws Exception
     {
-        Path jar = createJar(NotANativeInterface.class);
-
-        assertThrows(IllegalArgumentException.class, () -> NiagaraNativeBindingsGenerator.main(new String[] {"--backend=jni", "--contracts=" + jar,
-                "--java-out=" + temp.resolve("java"), "--cpp-out=" + temp.resolve("cpp")}));
-    }
-
-    @Test
-    void generatesTheFfmBindingsFromAJar() throws Exception
-    {
-        Path jar = createJar(SampleNatives.class, NotANativeInterface.class);
-
-        NiagaraNativeBindingsGenerator.main(new String[] {"--backend=ffm", "--contracts=" + jar, "--java-out=" + temp.resolve("java"),
-                "--ffm-package=me.ayydxn.niagara.ffm.generated"});
+        NiagaraNativeBindingsGenerator.main(new String[] {"--backend=ffm", "--java-out=" + temp.resolve("java"),
+                "--ffm-package=me.ayydxn.niagara.ffm.generated", SampleNatives.class.getName()});
 
         assertTrue(Files.exists(temp.resolve("java/me/ayydxn/niagara/ffm/generated/AbstractFFMSampleNatives.java")));
     }
 
     @Test
-    void failsOnMissingOrUnknownOptions() throws IOException
+    void generatesEveryNativeInterfaceThatIsPassed() throws Exception
     {
-        Path jar = createJar(SampleNatives.class);
+        NiagaraNativeBindingsGenerator.main(new String[] {"--backend=ffm", "--java-out=" + temp.resolve("java"), SampleNatives.class.getName(), PlainNatives.class.getName()});
 
-        assertThrows(IllegalArgumentException.class, () -> NiagaraNativeBindingsGenerator.main(new String[] {"--backend=jni"}));
-        assertThrows(IllegalArgumentException.class, () -> NiagaraNativeBindingsGenerator.main(new String[] {"--backend=nope", "--contracts=" + jar}));
-        assertThrows(IllegalArgumentException.class, () -> NiagaraNativeBindingsGenerator.main(new String[] {"--backend=ffm", "--contracts=" + jar}));
+        assertTrue(Files.exists(temp.resolve("java/me/ayydxn/niagara/ffm/generated/AbstractFFMSampleNatives.java")));
+        assertTrue(Files.exists(temp.resolve("java/me/ayydxn/niagara/ffm/generated/FFMPlainNatives.java")));
     }
 
-    private Path createJar(Class<?>... classes) throws IOException
+    @Test
+    void failsWhenNoNativeInterfaceIsPassed()
     {
-        Path jar = Files.createTempFile(temp, "contracts", ".jar");
+        assertThrows(IllegalArgumentException.class, () -> NiagaraNativeBindingsGenerator.main(new String[] {"--backend=jni",
+                "--java-out=" + temp.resolve("java"), "--cpp-out=" + temp.resolve("cpp")}));
+    }
 
-        try (OutputStream output = Files.newOutputStream(jar); JarOutputStream jarOutput = new JarOutputStream(output))
-        {
-            for (Class<?> type : classes)
-            {
-                String entryName = type.getName().replace('.', '/') + ".class";
+    @Test
+    void failsWhenAClassCantBeFound()
+    {
+        assertThrows(IllegalArgumentException.class, () -> NiagaraNativeBindingsGenerator.main(new String[] {"--backend=jni",
+                "--java-out=" + temp.resolve("java"), "--cpp-out=" + temp.resolve("cpp"), "me.ayydxn.niagara.DoesNotExist"}));
+    }
 
-                try (InputStream classFile = type.getClassLoader().getResourceAsStream(entryName))
-                {
-                    jarOutput.putNextEntry(new JarEntry(entryName));
-                    jarOutput.write(classFile.readAllBytes());
-                    jarOutput.closeEntry();
-                }
-            }
-        }
+    @Test
+    void failsWhenAClassIsNotANativeInterface()
+    {
+        assertThrows(IllegalArgumentException.class, () -> NiagaraNativeBindingsGenerator.main(new String[] {"--backend=jni",
+                "--java-out=" + temp.resolve("java"), "--cpp-out=" + temp.resolve("cpp"), NotANativeInterface.class.getName()}));
+    }
 
-        return jar;
+    @Test
+    void failsOnMissingOrUnknownOptions()
+    {
+        String sample = SampleNatives.class.getName();
+
+        assertThrows(IllegalArgumentException.class, () -> NiagaraNativeBindingsGenerator.main(new String[] {sample}));
+        assertThrows(IllegalArgumentException.class, () -> NiagaraNativeBindingsGenerator.main(new String[] {"--backend=nope", sample}));
+        assertThrows(IllegalArgumentException.class, () -> NiagaraNativeBindingsGenerator.main(new String[] {"--backend=ffm", sample}));
+        assertThrows(IllegalArgumentException.class, () -> NiagaraNativeBindingsGenerator.main(new String[] {"--backend", sample}));
     }
 }

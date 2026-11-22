@@ -4,10 +4,9 @@ import me.ayydxn.niagara.codegen.ffm.FFMNativeBindingsEmitter;
 import me.ayydxn.niagara.codegen.jni.JNINativeBindingsEmitter;
 
 import java.io.IOException;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,25 +20,39 @@ public class NiagaraNativeBindingsGenerator
     {
     }
 
+    /**
+     * Options are passed as {@code --name=value}. Every other argument is the fully qualified name of a native interface, which has to be on the generator's classpath.
+     */
     public static void main(String[] args) throws Exception
     {
-        Map<String, String> options = parseOptions(args);
+        Map<String, String> options = new HashMap<>();
+        List<String> nativeInterfaceNames = new ArrayList<>();
+
+        parseArguments(args, options, nativeInterfaceNames);
 
         String backend = option(options, "backend");
-        Path contractsJar = Path.of(option(options, "contracts"));
+        if (nativeInterfaceNames.isEmpty())
+            throw new IllegalArgumentException("Pass the class names of the native interfaces to generate bindings for");
 
-        try (URLClassLoader loader = new URLClassLoader(new URL[] {contractsJar.toUri().toURL()}, NiagaraNativeBindingsGenerator.class.getClassLoader()))
+        List<NativeInterfaceModel.Contract> contracts = nativeInterfaceNames.stream().map(NiagaraNativeBindingsGenerator::load).map(NativeInterfaceReader::read).toList();
+
+        switch (backend)
         {
-            List<NativeInterfaceModel.Contract> contracts = NativeInterfaceDiscovery.discover(contractsJar, loader).stream().map(NativeInterfaceReader::read).toList();
-            if (contracts.isEmpty())
-                throw new IllegalArgumentException("No @NativeContract interfaces found in " + contractsJar);
+            case "jni" -> generateJNIBindings(options, contracts);
+            case "ffm" -> generateFFMBindings(options, contracts);
+            default -> throw new IllegalArgumentException("Unknown backend \"" + backend + "\" (expected jni or ffm)");
+        }
+    }
 
-            switch (backend)
-            {
-                case "jni" -> generateJNIBindings(options, contracts);
-                case "ffm" -> generateFFMBindings(options, contracts);
-                default -> throw new IllegalArgumentException("Unknown backend \"" + backend + "\" (expected jni or ffm)");
-            }
+    private static Class<?> load(String className)
+    {
+        try
+        {
+            return Class.forName(className, false, NiagaraNativeBindingsGenerator.class.getClassLoader());
+        }
+        catch (ClassNotFoundException exception)
+        {
+            throw new IllegalArgumentException("Couldn't find the native interface " + className + " on the generator's classpath", exception);
         }
     }
 
@@ -74,20 +87,22 @@ public class NiagaraNativeBindingsGenerator
         }
     }
 
-    private static Map<String, String> parseOptions(String[] args)
+    private static void parseArguments(String[] args, Map<String, String> options, List<String> nativeInterfaceNames)
     {
-        Map<String, String> options = new HashMap<>();
-
         for (String arg : args)
         {
+            if (!arg.startsWith("--"))
+            {
+                nativeInterfaceNames.add(arg);
+                continue;
+            }
+
             int separator = arg.indexOf('=');
-            if (!arg.startsWith("--") || separator < 0)
+            if (separator < 0)
                 throw new IllegalArgumentException("Expected --name=value, got " + arg);
 
             options.put(arg.substring(2, separator), arg.substring(separator + 1));
         }
-
-        return options;
     }
 
     private static String option(Map<String, String> options, String name)
