@@ -223,7 +223,10 @@ public final class JNINativeBindingsEmitter
     {
         StringBuilder stringBuilder = new StringBuilder();
 
-        stringBuilder.append(GENERATED_BY).append(". DO NOT EDIT.\n#pragma once\n\n#include \"core/NativeInterfaceRegistry.h\"\n\n");
+        stringBuilder.append(GENERATED_BY).append(". DO NOT EDIT.\n");
+        stringBuilder.append("// Generated on ").append(LocalDateTime.now()).append(".\n");
+        stringBuilder.append("#pragma once\n\n#include \"core/NativeInterfaceRegistry.h\"\n\n");
+
         for (Contract contract : contracts)
             stringBuilder.append("#include \"").append(CPP_DIRECTORY).append('/').append(contract.baseName()).append(".h\"\n");
 

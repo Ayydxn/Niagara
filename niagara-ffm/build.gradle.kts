@@ -5,6 +5,12 @@ val nativeContractClassNames = rootProject.extra["nativeContractClassNames"] as 
 
 val generatedJavaDirectory = layout.buildDirectory.dir("generated/bindings/java")
 
+sourceSets {
+    main {
+        java.srcDir(generatedJavaDirectory)
+    }
+}
+
 dependencies {
     implementation(projects.niagaraCore)
 
@@ -20,7 +26,7 @@ java {
     targetCompatibility = JavaVersion.VERSION_22
 }
 
-tasks.register<JavaExec>("generateFFMNativeBindings") {
+val generateFFMNativeBindings = tasks.register<JavaExec>("generateFFMNativeBindings") {
     group = "native"
     description = "Generates the FFM Java classes from the native interfaces in niagara-core."
 
@@ -36,3 +42,7 @@ tasks.register<JavaExec>("generateFFMNativeBindings") {
         ) + nativeContractClassNames
     )
 }
+listOf("compileJava", "sourcesJar", "javadoc").forEach { taskName ->
+    tasks.named(taskName) { dependsOn(generateFFMNativeBindings) }
+}
+
