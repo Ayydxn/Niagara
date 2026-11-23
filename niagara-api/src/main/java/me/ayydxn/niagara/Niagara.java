@@ -1,14 +1,12 @@
 package me.ayydxn.niagara;
 
+import me.ayydxn.niagara.core.backend.NativeBackendManager;
+import me.ayydxn.niagara.core.backend.NativeBackendType;
 import me.ayydxn.niagara.core.loader.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.nio.file.Path;
-import java.util.Iterator;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.ServiceConfigurationError;
-import java.util.ServiceLoader;
+import java.util.*;
 import java.util.function.Supplier;
 
 /**
@@ -24,12 +22,15 @@ import java.util.function.Supplier;
  *     <li>macOS: {@code libUltralightCore.dylib}, {@code libWebCore.dylib}, {@code libUltralight.dylib} and {@code libAppCore.dylib}</li>
  *     <li>Linux: {@code libUltralightCore.so}, {@code libWebCore.so}, {@code libUltralight.so} and {@code libAppCore.so}</li>
  * </ul>
- *
- * Example Usage:
+ * <p>
+ * Niagara has two native backends: JNI ({@code niagara-jni}, Java 17+) and FFM ({@code niagara-ffm}, Java 22+). If both are on the classpath, FFM is used wherever the JVM can run it
+ * and JNI is used otherwise. To choose one yourself, set the {@value NativeBackendType#BACKEND_PROPERTY} system property to {@code jni} or {@code ffm}.
+ * <p>
+ * <h2>Example Usage</h2>
  * <pre>{@code
  *     public static void main(String[] args) {
  *         // Explicity provide a directory on disk
- *         Niagara.load(Path.of("C:\Libraries"));
+ *         Niagara.load(Path.of("C:/Libraries"));
  *
  *         // Rely the path from the system property
  *         Niagara.load();
@@ -38,6 +39,11 @@ import java.util.function.Supplier;
  */
 public final class Niagara
 {
+    private static final List<NativeBackendType> BACKEND_PREFERENCE = List.of(NativeBackendType.FFM, NativeBackendType.JNI);
+
+    // Only a safeguard. The service loader skips each failing provider, so we should never get anywhere near this.
+    private static final int MAX_PROVIDER_FAILURES = 8;
+
     private static volatile NativeLibraryLoadStatus loadStatus = NativeLibraryLoadStatus.notLoaded();
     private static Path loadedDirectory;
 
@@ -121,7 +127,10 @@ public final class Niagara
             NativeLibraryPlatform nativeLibraryPlatform = platformSupplier.get();
             NativeLibraries nativeLibraries = NativeLibraries.locate(nativeLibraryPlatform, explicitDirectory);
 
-            providerSupplier.get().load(nativeLibraryPlatform, nativeLibraries);
+            NativeLibraryProvider nativeLibraryProvider = providerSupplier.get();
+            nativeLibraryProvider.load(nativeLibraryPlatform, nativeLibraries);
+
+            NativeBackendManager.install(nativeLibraryProvider.createNativeBackend());
 
             loadedDirectory = nativeLibraries.directory();
             loadStatus = NativeLibraryLoadStatus.loaded();
@@ -148,16 +157,75 @@ public final class Niagara
 
     static NativeLibraryProvider discoverProvider()
     {
-        Iterator<NativeLibraryProvider> nativeLibraryProviders = ServiceLoader.load(NativeLibraryProvider.class).iterator();
-        if (!nativeLibraryProviders.hasNext())
-            throw new NativeLibraryLoadException(NativeLibraryLoadStatus.FailureReason.BACKEND_UNAVAILABLE, "No Niagara native backend was found!");
+        List<NativeLibraryProvider> nativeLibraryProviders = new ArrayList<>();
+        Throwable loadFailure = null;
+        int failureCount = 0;
 
-        return nativeLibraryProviders.next();
+        Iterator<NativeLibraryProvider> iterator = ServiceLoader.load(NativeLibraryProvider.class).iterator();
+
+        while (true)
+        {
+            try
+            {
+                if (!iterator.hasNext())
+                    break;
+
+                nativeLibraryProviders.add(iterator.next());
+            }
+            catch (ServiceConfigurationError | LinkageError error)
+            {
+                // A backend the JVM can't load (e.g., niagara-ffm on Java 17) must not stop us from using one that it can.
+                if (loadFailure == null)
+                {
+                    loadFailure = error;
+                }
+                else
+                {
+                    loadFailure.addSuppressed(error);
+                }
+
+                if (++failureCount >= MAX_PROVIDER_FAILURES)
+                    break;
+            }
+        }
+
+        return Niagara.selectProvider(nativeLibraryProviders, System.getProperty(NativeBackendType.BACKEND_PROPERTY), loadFailure);
+
+    }
+
+    static NativeLibraryProvider selectProvider(List<NativeLibraryProvider> nativeLibraryProviders, String requestedBackend, Throwable loadFailure)
+    {
+        if (requestedBackend != null && !requestedBackend.isBlank())
+        {
+            NativeBackendType requestedType = NativeBackendType.fromName(requestedBackend).orElseThrow(() ->
+            {
+                String message = String.format("The %s system property must be jni or ffm, but it is \"%s\"", NativeBackendType.BACKEND_PROPERTY, requestedBackend.trim());
+
+                return new NativeLibraryLoadException(NativeLibraryLoadStatus.FailureReason.BACKEND_UNAVAILABLE, message);
+            });
+
+            return nativeLibraryProviders.stream().filter(provider -> provider.getType() == requestedType).findFirst().orElseThrow(() ->
+            {
+                String message = String.format("The %s system property asks for the %s backend, but it isn't available. Check that niagara-jni or niagara-ffm is on the classpath and that " +
+                    "your JVM can run it (FFM needs Java 22 or newer)", NativeBackendType.BACKEND_PROPERTY, requestedType);
+
+                return new NativeLibraryLoadException(NativeLibraryLoadStatus.FailureReason.BACKEND_UNAVAILABLE, message, loadFailure);
+            });
+        }
+
+        return nativeLibraryProviders.stream().min(Comparator.comparingInt(nativeLibraryProvider -> BACKEND_PREFERENCE.indexOf(nativeLibraryProvider.getType()))).orElseThrow(() ->
+        {
+            String message = loadFailure == null ? "No Niagara native backend was found!" : "No Niagara native backend could be loaded: " + loadFailure.getMessage();
+
+            return new NativeLibraryLoadException(NativeLibraryLoadStatus.FailureReason.BACKEND_UNAVAILABLE, message, loadFailure);
+        });
     }
 
     static synchronized void resetForTesting()
     {
         loadStatus = NativeLibraryLoadStatus.notLoaded();
         loadedDirectory = null;
+
+        NativeBackendManager.uninstall();
     }
 }

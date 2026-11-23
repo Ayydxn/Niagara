@@ -34,7 +34,9 @@ public class NiagaraNativeBindingsGenerator
         if (nativeInterfaceNames.isEmpty())
             throw new IllegalArgumentException("Pass the class names of the native interfaces to generate bindings for");
 
-        List<NativeInterfaceModel.Contract> contracts = nativeInterfaceNames.stream().map(NiagaraNativeBindingsGenerator::load).map(NativeInterfaceReader::read).toList();
+        List<NativeInterfaceModel.Contract> contracts = nativeInterfaceNames.stream().map(NiagaraNativeBindingsGenerator::load)
+            .map(NativeInterfaceReader::read)
+            .toList();
 
         switch (backend)
         {

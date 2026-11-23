@@ -1,5 +1,7 @@
 package me.ayydxn.niagara.jni;
 
+import me.ayydxn.niagara.core.backend.NativeBackend;
+import me.ayydxn.niagara.core.backend.NativeBackendType;
 import me.ayydxn.niagara.core.loader.*;
 
 import java.io.IOException;
@@ -17,6 +19,12 @@ public final class JNINativeLibraryProvider implements NativeLibraryProvider
     private static final String CACHE_DIRECTORY_NAME = "niagara-natives";
 
     @Override
+    public NativeBackend createNativeBackend()
+    {
+        return new JNINativeBackend();
+    }
+
+    @Override
     public void load(NativeLibraryPlatform platform, NativeLibraries libraries)
     {
         // Everything that can fail without touching native code happens first.
@@ -27,6 +35,12 @@ public final class JNINativeLibraryProvider implements NativeLibraryProvider
             JNINativeLibraryProvider.loadLibrary(library);
 
         JNINativeLibraryProvider.loadLibrary(bridgePath);
+    }
+
+    @Override
+    public NativeBackendType getType()
+    {
+        return NativeBackendType.JNI;
     }
 
     private static byte[] readEmbeddedBridge(NativeLibraryPlatform platform)

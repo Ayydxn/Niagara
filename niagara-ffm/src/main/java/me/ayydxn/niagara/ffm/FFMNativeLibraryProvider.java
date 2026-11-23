@@ -1,5 +1,7 @@
 package me.ayydxn.niagara.ffm;
 
+import me.ayydxn.niagara.core.backend.NativeBackend;
+import me.ayydxn.niagara.core.backend.NativeBackendType;
 import me.ayydxn.niagara.core.loader.NativeLibraries;
 import me.ayydxn.niagara.core.loader.NativeLibraryLoadException;
 import me.ayydxn.niagara.core.loader.NativeLibraryLoadStatus.FailureReason;
@@ -15,6 +17,12 @@ public final class FFMNativeLibraryProvider implements NativeLibraryProvider
     private static volatile SymbolLookup symbolLookup;
 
     @Override
+    public NativeBackend createNativeBackend()
+    {
+        return new FFMNativeBackend();
+    }
+
+    @Override
     public void load(NativeLibraryPlatform nativeLibraryPlatform, NativeLibraries nativeLibraries)
     {
         SymbolLookup combinedSymbolLookup = null;
@@ -27,6 +35,12 @@ public final class FFMNativeLibraryProvider implements NativeLibraryProvider
         }
 
         symbolLookup = combinedSymbolLookup;
+    }
+
+    @Override
+    public NativeBackendType getType()
+    {
+        return NativeBackendType.FFM;
     }
 
     public static SymbolLookup getSymbolLookup()

@@ -1,42 +1,50 @@
 package me.ayydxn.niagara;
 
+import me.ayydxn.niagara.core.backend.NativeBackend;
+import me.ayydxn.niagara.core.backend.NativeBackendManager;
+import me.ayydxn.niagara.core.backend.NativeBackendType;
 import me.ayydxn.niagara.core.loader.*;
 import me.ayydxn.niagara.core.loader.NativeLibraryLoadStatus.FailureReason;
+import me.ayydxn.niagara.core.natives.UltralightNatives;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.List;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 class NiagaraTest
 {
     private static final NativeLibraryPlatform PLATFORM = NativeLibraryPlatform.LINUX_X64;
 
     private Path directory;
-    private RecordingProvider provider;
+    private TestProvider provider;
 
     @BeforeEach
     void setUp() throws IOException
     {
         System.clearProperty(NativeLibraries.LIBRARIES_DIRECTORY_PROPERTY);
+        System.clearProperty(NativeBackendType.BACKEND_PROPERTY);
         Niagara.resetForTesting();
 
         this.directory = NiagaraTest.createLibraryDirectory();
-        this.provider = new RecordingProvider();
+        this.provider = new TestProvider(NativeBackendType.JNI);
     }
 
     @AfterEach
     void tearDown() throws IOException
     {
         System.clearProperty(NativeLibraries.LIBRARIES_DIRECTORY_PROPERTY);
+        System.clearProperty(NativeBackendType.BACKEND_PROPERTY);
         Niagara.resetForTesting();
 
         NiagaraTest.deleteDirectory(this.directory);
@@ -109,7 +117,7 @@ class NiagaraTest
     void failsOnAnUnsupportedPlatform()
     {
         NativeLibraryLoadException exception = assertThrows(NativeLibraryLoadException.class, () -> Niagara.loadWith(this.directory,
-                () -> NativeLibraryPlatform.detect("FreeBSD", "amd64"), () -> this.provider));
+            () -> NativeLibraryPlatform.detect("FreeBSD", "amd64"), () -> this.provider));
 
         assertEquals(FailureReason.UNSUPPORTED_PLATFORM, exception.getFailureReason());
         assertEquals(NativeLibraryLoadStatus.failed(FailureReason.UNSUPPORTED_PLATFORM), Niagara.getLoadStatus());
@@ -118,7 +126,8 @@ class NiagaraTest
     @Test
     void reportsAnUnsatisfiedLinkErrorAsANativeLoadFailure()
     {
-        NativeLibraryProvider failingProvider = (platform, libraries) ->
+        TestProvider failingProvider = new TestProvider(NativeBackendType.JNI);
+        failingProvider.loadAction = () ->
         {
             throw new UnsatisfiedLinkError("boom");
         };
@@ -129,7 +138,8 @@ class NiagaraTest
     @Test
     void reportsAnythingElseAsUnknown()
     {
-        NativeLibraryProvider failingProvider = (platform, libraries) ->
+        TestProvider failingProvider = new TestProvider(NativeBackendType.JNI);
+        failingProvider.loadAction = () ->
         {
             throw new IllegalArgumentException("boom");
         };
@@ -148,11 +158,100 @@ class NiagaraTest
     }
 
     @Test
+    void installsTheBackendOfTheLoadedProvider()
+    {
+        this.load(this.directory);
+
+        assertSame(this.provider.backend, NativeBackendManager.getCurrentBackendInstance());
+    }
+
+    @Test
+    void doesNotInstallABackendWhenLoadingFails()
+    {
+        TestProvider failingProvider = new TestProvider(NativeBackendType.JNI);
+        failingProvider.loadAction = () ->
+        {
+            throw new UnsatisfiedLinkError("boom");
+        };
+
+        this.assertLoadFails(FailureReason.NATIVE_LOAD_FAILED, this.directory, failingProvider);
+
+        assertThrows(IllegalStateException.class, NativeBackendManager::getCurrentBackendInstance);
+    }
+
+    @Test
     void failsWhenNoBackendIsAvailable()
     {
         NativeLibraryLoadException exception = assertThrows(NativeLibraryLoadException.class, Niagara::discoverProvider);
 
         assertEquals(FailureReason.BACKEND_UNAVAILABLE, exception.getFailureReason());
+    }
+
+    @Test
+    void prefersFfmWhenBothBackendsAreAvailable()
+    {
+        TestProvider jni = new TestProvider(NativeBackendType.JNI);
+        TestProvider ffm = new TestProvider(NativeBackendType.FFM);
+
+        assertSame(ffm, Niagara.selectProvider(List.of(jni, ffm), null, null));
+        assertSame(ffm, Niagara.selectProvider(List.of(ffm, jni), null, null));
+    }
+
+    @Test
+    void usesTheOnlyBackendThatIsAvailable()
+    {
+        TestProvider jni = new TestProvider(NativeBackendType.JNI);
+        TestProvider ffm = new TestProvider(NativeBackendType.FFM);
+
+        assertSame(jni, Niagara.selectProvider(List.of(jni), null, null));
+        assertSame(ffm, Niagara.selectProvider(List.of(ffm), "", null));
+    }
+
+    @Test
+    void theBackendPropertyForcesTheRequestedBackend()
+    {
+        TestProvider jni = new TestProvider(NativeBackendType.JNI);
+        TestProvider ffm = new TestProvider(NativeBackendType.FFM);
+
+        assertSame(jni, Niagara.selectProvider(List.of(jni, ffm), "jni", null));
+        assertSame(jni, Niagara.selectProvider(List.of(ffm, jni), "  JNI ", null));
+        assertSame(ffm, Niagara.selectProvider(List.of(jni, ffm), "Ffm", null));
+    }
+
+    @Test
+    void failsWhenTheRequestedBackendIsNotAvailable()
+    {
+        TestProvider jni = new TestProvider(NativeBackendType.JNI);
+        Error loadFailure = new UnsupportedClassVersionError("too new");
+
+        NativeLibraryLoadException exception = assertThrows(NativeLibraryLoadException.class, () -> Niagara.selectProvider(List.of(jni),
+            "ffm", loadFailure));
+
+        assertEquals(FailureReason.BACKEND_UNAVAILABLE, exception.getFailureReason());
+        assertSame(loadFailure, exception.getCause());
+    }
+
+    @Test
+    void failsOnAnUnknownBackendName()
+    {
+        TestProvider jni = new TestProvider(NativeBackendType.JNI);
+
+        NativeLibraryLoadException exception = assertThrows(NativeLibraryLoadException.class, () -> Niagara.selectProvider(List.of(jni),
+            "panama", null));
+
+        assertEquals(FailureReason.BACKEND_UNAVAILABLE, exception.getFailureReason());
+    }
+
+    @Test
+    void reportsWhyNoBackendCouldBeLoaded()
+    {
+        Error loadFailure = new UnsupportedClassVersionError("too new");
+
+        NativeLibraryLoadException exception = assertThrows(NativeLibraryLoadException.class, () -> Niagara.selectProvider(List.of(),
+            null, loadFailure));
+
+        assertEquals(FailureReason.BACKEND_UNAVAILABLE, exception.getFailureReason());
+        assertSame(loadFailure, exception.getCause());
     }
 
     private void load(Path explicitDirectory)
@@ -164,8 +263,8 @@ class NiagaraTest
     {
         Supplier<NativeLibraryProvider> providerSupplier = () -> failingProvider;
 
-        NativeLibraryLoadException exception = assertThrows(NativeLibraryLoadException.class,
-                () -> Niagara.loadWith(explicitDirectory, () -> PLATFORM, providerSupplier));
+        NativeLibraryLoadException exception = assertThrows(NativeLibraryLoadException.class, () -> Niagara.loadWith(explicitDirectory,
+            () -> PLATFORM, providerSupplier));
 
         assertEquals(reason, exception.getFailureReason());
         assertEquals(NativeLibraryLoadStatus.failed(reason), Niagara.getLoadStatus());
@@ -189,19 +288,67 @@ class NiagaraTest
         }
     }
 
-    private static final class RecordingProvider implements NativeLibraryProvider
+    private static final class TestProvider implements NativeLibraryProvider
     {
-        private int loadCount;
+        private final NativeBackendType type;
+        private final NativeBackend backend;
+
+        private Runnable loadAction = () -> {};
         private NativeLibraryPlatform platform;
         private NativeLibraries libraries;
+        private int loadCount;
+
+        private TestProvider(NativeBackendType nativeBackendType)
+        {
+            this.type = nativeBackendType;
+            this.backend = new StubBackend(nativeBackendType);
+        }
+
+        @Override
+        public NativeBackend createNativeBackend()
+        {
+            return this.backend;
+        }
 
         @Override
         public void load(NativeLibraryPlatform platform, NativeLibraries libraries)
         {
+            this.loadAction.run();
+
             this.loadCount++;
 
             this.platform = platform;
             this.libraries = libraries;
+        }
+
+        @Override
+        public NativeBackendType getType()
+        {
+            return this.type;
+        }
+    }
+
+    // None of these are ever called. They only have to exist for the backend to be complete.
+    private record StubBackend(NativeBackendType type) implements NativeBackend
+    {
+        @Override
+        public @NotNull NativeBackendType getType()
+        {
+            return this.type;
+        }
+
+        @Override
+        public @NotNull UltralightNatives ultralight()
+        {
+            return StubBackend.stub(UltralightNatives.class);
+        }
+
+        private static <T> T stub(Class<T> type)
+        {
+            return type.cast(Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, (proxy, method, arguments) ->
+            {
+                throw new UnsupportedOperationException();
+            }));
         }
     }
 }
