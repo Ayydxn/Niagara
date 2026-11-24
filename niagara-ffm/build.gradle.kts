@@ -1,4 +1,8 @@
-val generatorClasspath: Configuration by configurations.creating
+plugins {
+    id("ultralight-libraries")
+}
+
+val generatorClasspath = configurations.create("generatorClasspath")
 
 @Suppress("UNCHECKED_CAST")
 val nativeContractClassNames = rootProject.extra["nativeContractClassNames"] as List<String>
@@ -15,6 +19,8 @@ dependencies {
     implementation(projects.niagaraCore)
 
     "generatorClasspath"(projects.niagaraCodegen)
+
+    testImplementation(projects.niagaraApi)
 }
 
 java {
@@ -42,7 +48,11 @@ val generateFFMNativeBindings = tasks.register<JavaExec>("generateFFMNativeBindi
         ) + nativeContractClassNames
     )
 }
+
 listOf("compileJava", "sourcesJar", "javadoc").forEach { taskName ->
     tasks.named(taskName) { dependsOn(generateFFMNativeBindings) }
 }
 
+tasks.test {
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+}

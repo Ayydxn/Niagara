@@ -10,6 +10,7 @@ include(
     "niagara-api",
     "niagara-codegen",
     "niagara-core",
+    "niagara-demo",
     "niagara-jni",
     "niagara-ffm"
 )

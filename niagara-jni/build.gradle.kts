@@ -1,7 +1,10 @@
 import java.security.MessageDigest
-import java.util.Properties
 
-val generatorClasspath: Configuration by configurations.creating
+plugins {
+    id("ultralight-libraries")
+}
+
+val generatorClasspath = configurations.create("generatorClasspath")
 
 @Suppress("UNCHECKED_CAST")
 val nativeContractClassNames = rootProject.extra["nativeContractClassNames"] as List<String>
@@ -9,20 +12,12 @@ val nativeContractClassNames = rootProject.extra["nativeContractClassNames"] as 
 val generatedJavaDirectory = layout.buildDirectory.dir("generated/bindings/java")
 val generatedNativeDirectory = layout.buildDirectory.dir("generated/bindings/native")
 
-val localProperties = Properties().apply {
-    val localPropertiesFile = rootProject.file("local.properties")
-
-    if (localPropertiesFile.exists())
-        load(localPropertiesFile.inputStream())
-}
-
-val ultralightSdkLocation: String = (localProperties.getProperty("ultralight_sdk_location") ?: findProperty("ultralight_sdk_location") as String? ?: "").also {
-    if (it.isBlank()) {
-        logger.warn(
-            "\n[niagara-jni] WARNING: 'ultralight_sdk_location' is not set. JNI bridge library compilation will be skipped.\n" +
-                    "  Set it in local.properties or pass -Pultralight_sdk_location=<path>.\n"
-        )
-    }
+val ultralightSdkLocation = ultralightLibraries.sdkLocation
+if (ultralightSdkLocation.isBlank()) {
+    logger.warn(
+        "\n[niagara-jni] WARNING: 'ultralight_sdk_location' is not set. JNI bridge library compilation will be skipped.\n" +
+            "  Set it in local.properties or pass -Pultralight_sdk_location=<path>.\n"
+    )
 }
 
 // When set, the native build is skipped, and this directory (laid out as <platform>/<library>) is bundled as-is instead.
@@ -73,6 +68,8 @@ dependencies {
     implementation(projects.niagaraCore)
 
     "generatorClasspath"(projects.niagaraCodegen)
+
+    testImplementation(projects.niagaraApi)
 }
 
 val configureCMake = tasks.register("configureCMake", Exec::class) {
@@ -130,8 +127,7 @@ val stageJNIBridgeLibrary = tasks.register<Sync>("stageJNIBridgeLibrary") {
     group = "native"
     description = "Stages the compiled JNI bridge library so it's bundled into the jar's resources"
 
-    if (usePrebuiltNatives)
-    {
+    if (usePrebuiltNatives) {
         val prebuiltNativesDirectory = rootProject.file(prebuiltNativesLocation)
 
         doFirst {
@@ -142,9 +138,7 @@ val stageJNIBridgeLibrary = tasks.register<Sync>("stageJNIBridgeLibrary") {
         from(prebuiltNativesDirectory) {
             into("natives")
         }
-    }
-    else
-    {
+    } else {
         dependsOn(compileNative)
 
         onlyIf { ultralightSdkLocation.isNotBlank() }
