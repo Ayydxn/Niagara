@@ -50,7 +50,7 @@ class ContractReaderTest
     @Test
     void rejectsTypesThatAreNotContracts()
     {
-        assertMessage("is missing @NativeContract", Runnable.class);
+        assertMessage("is missing @NativeInterface", Runnable.class);
         assertMessage("is not an interface", InvalidNativeInterfaces.NotAnInterfaceNatives.class);
         assertMessage("has to be named <Something>Natives", InvalidNativeInterfaces.WrongName.class);
     }
@@ -61,7 +61,6 @@ class ContractReaderTest
         assertMessage("@NativePointer needs a long", InvalidNativeInterfaces.PointerOnIntNatives.class);
         assertMessage("can't be combined", InvalidNativeInterfaces.BothStringKindsNatives.class);
         assertMessage("need a String", InvalidNativeInterfaces.StringAnnotationOnLongNatives.class);
-        assertMessage("Unsupported type double", InvalidNativeInterfaces.UnsupportedTypeNatives.class);
     }
 
     @Test

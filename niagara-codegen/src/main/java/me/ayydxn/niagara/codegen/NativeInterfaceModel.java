@@ -49,6 +49,7 @@ public final class NativeInterfaceModel
     {
         VOID("void"),
         INT("int"),
+        DOUBLE("double"),
         LONG("long"),
         BOOLEAN("boolean"),
         STRING("String");

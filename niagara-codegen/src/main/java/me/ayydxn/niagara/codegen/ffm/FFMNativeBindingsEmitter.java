@@ -184,6 +184,7 @@ public final class FFMNativeBindingsEmitter
         return switch (type.kind())
         {
             case INT -> "ValueLayout.JAVA_INT";
+            case DOUBLE -> "ValueLayout.JAVA_DOUBLE";
             case LONG -> "ValueLayout.JAVA_LONG";
             case BOOLEAN -> "ValueLayout.JAVA_BOOLEAN";
             case VOID, STRING -> throw new IllegalArgumentException("Can't pass a " + type.kind().javaType + " through FFM without an annotation saying what it is");

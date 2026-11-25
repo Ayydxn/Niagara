@@ -49,6 +49,7 @@ target_link_libraries(NiagaraJNIBridge PRIVATE
         Ultralight
         UltralightCore
         WebCore
+        AppCore
 )
 
 target_compile_definitions(NiagaraJNIBridge PRIVATE

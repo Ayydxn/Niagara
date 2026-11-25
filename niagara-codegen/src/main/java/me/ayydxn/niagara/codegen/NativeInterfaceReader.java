@@ -17,8 +17,8 @@ public final class NativeInterfaceReader
     public static Contract read(Class<?> type)
     {
         NativeInterface annotation = type.getAnnotation(NativeInterface.class);
-        require(annotation != null, type.getName() + " is missing @NativeContract");
-        require(type.isInterface(), type.getName() + " has @NativeContract but is not an interface");
+        require(annotation != null, type.getName() + " is missing @NativeInterface");
+        require(type.isInterface(), type.getName() + " has @NativeInterface but is not an interface");
         require(type.getSimpleName().length() > NativeInterfaceModel.CONTRACT_SUFFIX.length() && type.getSimpleName().endsWith(NativeInterfaceModel.CONTRACT_SUFFIX),
                 type.getName() + " has to be named <Something>" + NativeInterfaceModel.CONTRACT_SUFFIX);
 
@@ -53,6 +53,7 @@ public final class NativeInterfaceReader
     {
         Kind kind = javaType == void.class ? Kind.VOID
                 : javaType == int.class ? Kind.INT
+                : javaType == double.class ? Kind.DOUBLE
                 : javaType == long.class ? Kind.LONG
                 : javaType == boolean.class ? Kind.BOOLEAN
                 : javaType == String.class ? Kind.STRING

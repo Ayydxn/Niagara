@@ -5,6 +5,8 @@ import me.ayydxn.niagara.core.backend.NativeBackendManager;
 import me.ayydxn.niagara.core.backend.NativeBackendType;
 import me.ayydxn.niagara.core.loader.*;
 import me.ayydxn.niagara.core.loader.NativeLibraryLoadStatus.FailureReason;
+import me.ayydxn.niagara.core.natives.ULConfigNatives;
+import me.ayydxn.niagara.core.natives.ULStringNatives;
 import me.ayydxn.niagara.core.natives.UltralightNatives;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.AfterEach;
@@ -341,6 +343,18 @@ class NiagaraTest
         public @NotNull UltralightNatives ultralight()
         {
             return StubBackend.stub(UltralightNatives.class);
+        }
+
+        @Override
+        public @NotNull ULConfigNatives ulConfig()
+        {
+            return StubBackend.stub(ULConfigNatives.class);
+        }
+
+        @Override
+        public @NotNull ULStringNatives ulString()
+        {
+            return StubBackend.stub(ULStringNatives.class);
         }
 
         private static <T> T stub(Class<T> type)

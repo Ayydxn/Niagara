@@ -288,6 +288,7 @@ public final class JNINativeBindingsEmitter
         {
             case VOID -> "void";
             case INT -> "jint";
+            case DOUBLE -> "jdouble";
             case LONG -> "jlong";
             case BOOLEAN -> "jboolean";
             case STRING -> "jstring";
@@ -300,6 +301,7 @@ public final class JNINativeBindingsEmitter
         {
             case VOID -> "V";
             case INT -> "I";
+            case DOUBLE -> "D";
             case LONG -> "J";
             case BOOLEAN -> "Z";
             case STRING -> "Ljava/lang/String;";
