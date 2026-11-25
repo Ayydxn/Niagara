@@ -21,6 +21,7 @@ dependencies {
     "generatorClasspath"(projects.niagaraCodegen)
 
     testImplementation(projects.niagaraApi)
+    testImplementation(testFixtures(projects.niagaraCore))
 }
 
 java {

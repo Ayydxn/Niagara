@@ -70,6 +70,7 @@ dependencies {
     "generatorClasspath"(projects.niagaraCodegen)
 
     testImplementation(projects.niagaraApi)
+    testImplementation(testFixtures(projects.niagaraCore))
 }
 
 val configureCMake = tasks.register("configureCMake", Exec::class) {
