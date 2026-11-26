@@ -23,7 +23,7 @@ public final class ULConfig implements AutoCloseable
         }
     }
 
-    public void setResourcePath(String resourcePathPrefix)
+    public void setResourcePathPrefix(String resourcePathPrefix)
     {
         try (ULString resourcePathPrefixString = ULString.create(resourcePathPrefix))
         {
