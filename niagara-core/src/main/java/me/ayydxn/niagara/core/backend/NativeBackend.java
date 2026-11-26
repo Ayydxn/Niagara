@@ -1,6 +1,7 @@
 package me.ayydxn.niagara.core.backend;
 
 import me.ayydxn.niagara.core.natives.ULConfigNatives;
+import me.ayydxn.niagara.core.natives.ULPlatformNatives;
 import me.ayydxn.niagara.core.natives.ULStringNatives;
 import me.ayydxn.niagara.core.natives.UltralightNatives;
 import org.jetbrains.annotations.NotNull;
@@ -12,6 +13,9 @@ public interface NativeBackend
 
     @NotNull
     ULConfigNatives ulConfig();
+
+    @NotNull
+    ULPlatformNatives ulPlatform();
 
     @NotNull
     ULStringNatives ulString();

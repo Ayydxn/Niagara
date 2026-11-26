@@ -3,9 +3,11 @@ package me.ayydxn.niagara.jni;
 import me.ayydxn.niagara.core.backend.NativeBackend;
 import me.ayydxn.niagara.core.backend.NativeBackendType;
 import me.ayydxn.niagara.core.natives.ULConfigNatives;
+import me.ayydxn.niagara.core.natives.ULPlatformNatives;
 import me.ayydxn.niagara.core.natives.ULStringNatives;
 import me.ayydxn.niagara.core.natives.UltralightNatives;
 import me.ayydxn.niagara.jni.generated.JNIULConfigNatives;
+import me.ayydxn.niagara.jni.generated.JNIULPlatformNatives;
 import me.ayydxn.niagara.jni.generated.JNIULStringNatives;
 import me.ayydxn.niagara.jni.generated.JNIUltralightNatives;
 import org.jetbrains.annotations.NotNull;
@@ -14,12 +16,14 @@ public final class JNINativeBackend implements NativeBackend
 {
     private final JNIUltralightNatives ultralight;
     private final JNIULConfigNatives ulConfig;
+    private final JNIULPlatformNatives ulPlatform;
     private final JNIULStringNatives ulString;
 
     public JNINativeBackend()
     {
         this.ultralight = new JNIUltralightNatives();
         this.ulConfig = new JNIULConfigNatives();
+        this.ulPlatform = new JNIULPlatformNatives();
         this.ulString = new JNIULStringNatives();
     }
 
@@ -33,6 +37,12 @@ public final class JNINativeBackend implements NativeBackend
     public @NotNull ULConfigNatives ulConfig()
     {
         return this.ulConfig;
+    }
+
+    @Override
+    public @NotNull ULPlatformNatives ulPlatform()
+    {
+        return this.ulPlatform;
     }
 
     @Override

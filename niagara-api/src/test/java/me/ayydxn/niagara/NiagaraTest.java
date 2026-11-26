@@ -6,6 +6,7 @@ import me.ayydxn.niagara.core.backend.NativeBackendType;
 import me.ayydxn.niagara.core.loader.*;
 import me.ayydxn.niagara.core.loader.NativeLibraryLoadStatus.FailureReason;
 import me.ayydxn.niagara.core.natives.ULConfigNatives;
+import me.ayydxn.niagara.core.natives.ULPlatformNatives;
 import me.ayydxn.niagara.core.natives.ULStringNatives;
 import me.ayydxn.niagara.core.natives.UltralightNatives;
 import org.jetbrains.annotations.NotNull;
@@ -349,6 +350,12 @@ class NiagaraTest
         public @NotNull ULConfigNatives ulConfig()
         {
             return StubBackend.stub(ULConfigNatives.class);
+        }
+
+        @Override
+        public @NotNull ULPlatformNatives ulPlatform()
+        {
+            return StubBackend.stub(ULPlatformNatives.class);
         }
 
         @Override
